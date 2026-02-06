@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SchoolSpace</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts (Optional for better look) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .hide { display: none !important; }
+        
+        /* Custom Scrollbar for nicer look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Smooth fade in */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Slide up for modal */
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-white text-slate-900 h-screen flex flex-col overflow-hidden">
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="fixed inset-0 z-[100] bg-white flex items-center justify-center">
+        <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="hide overflow-y-auto w-full h-full bg-slate-50 flex items-center justify-center p-6">
+        <div class="bg-white p-8 md:p-10 rounded-[3rem] shadow-2xl w-full max-w-md border border-slate-100 flex flex-col items-center fade-in">
+            <div class="w-20 h-20 bg-gradient-to-tr from-blue-700 to-blue-400 rounded-[1.8rem] flex items-center justify-center text-white mb-6 shadow-xl rotate-3">
+                <i data-lucide="shield-check" width="40" height="40"></i>
+            </div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tighter mb-1 italic">SchoolSpace</h1>
+            <p class="text-slate-400 font-bold text-[9px] tracking-[0.3em] uppercase mb-8 text-center">Твій цифровий простір</p>
+
+            <button id="btn-google-login" class="w-full flex items-center justify-center gap-3 border-2 border-slate-100 py-4 rounded-2xl font-black text-slate-700 hover:bg-slate-50 active:scale-95 transition-all mb-4">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="G" />
+                Вхід через Google
+            </button>
+
+            <!-- Error Messages -->
+            <div id="auth-error" class="hide w-full bg-red-50 border-2 border-red-100 p-4 rounded-2xl mb-4 text-red-700 font-bold text-[11px] flex items-center gap-2">
+                <i data-lucide="alert-circle" width="16"></i> <span id="auth-error-text"></span>
+            </div>
+            
+            <div id="domain-debug" class="hide w-full bg-orange-50 border-2 border-orange-100 p-4 rounded-2xl mb-4">
+                <div class="flex items-center gap-2 text-orange-700 font-black text-[10px] uppercase mb-2">
+                    <i data-lucide="globe" width="14"></i> Налаштування Firebase
+                </div>
+                <p class="text-[11px] text-orange-800 mb-3 font-medium leading-tight">Додайте цей домен у Authorized Domains:</p>
+                <div class="flex items-center gap-2 bg-white p-2 rounded-xl border border-orange-200">
+                    <code id="domain-text" class="text-[10px] font-mono font-bold text-orange-900 truncate flex-1"></code>
+                    <button id="btn-copy-domain" class="p-2 bg-orange-600 text-white rounded-lg active:scale-90 transition-all hover:bg-orange-700">
+                        <i data-lucide="copy" width="14"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="w-full flex items-center gap-4 my-4 text-slate-200">
+                <div class="h-px bg-current flex-1"></div>
+                <span class="text-[10px] font-black uppercase tracking-widest italic">або</span>
+                <div class="h-px bg-current flex-1"></div>
+            </div>
+
+            <form id="email-auth-form" class="w-full space-y-3">
+                <input id="input-name" type="text" placeholder="Ім'я" class="hide w-full p-4 bg-slate-50 border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold transition-all text-sm">
+                <input id="input-email" type="email" placeholder="Email" class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold transition-all text-sm" required>
+                <input id="input-password" type="password" placeholder="Пароль" class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-blue-500 rounded-2xl outline-none font-bold transition-all text-sm" required>
+                <button type="submit" id="btn-submit-auth" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-blue-700 transition-all uppercase tracking-widest active:scale-95 text-xs">
+                    Увійти
+                </button>
+            </form>
+
+            <button id="btn-toggle-auth" class="mt-6 text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] hover:text-blue-600 transition-colors">
+                Ще немає акаунту? Реєстрація
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="app-screen" class="hide flex flex-col h-full max-w-xl mx-auto w-full border-x border-slate-100 bg-white relative">
+        
+        <!-- Header -->
+        <header class="flex-none bg-white/95 backdrop-blur-xl border-b p-5 flex justify-between items-center shadow-sm z-50">
+            <button id="btn-logout" class="text-slate-300 hover:text-red-500 transition-all p-2 bg-slate-50 rounded-xl">
+                <i data-lucide="log-out" width="20"></i>
+            </button>
+            <span class="font-black text-2xl text-blue-600 italic tracking-tighter uppercase">SchoolSpace</span>
+            <div id="user-avatar" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black shadow-lg shadow-blue-100 border-2 border-white">
+                <!-- Initials injected here -->
+            </div>
+        </header>
+
+        <!-- Top 5 Header Banner (Conditional) -->
+        <div id="top5-banner" class="hide flex-none p-6 bg-gradient-to-br from-amber-400 to-orange-500 text-white animate-in fade-in slide-in-from-top-4 duration-300">
+            <div class="flex items-center gap-3">
+                <i data-lucide="flame" width="32" class="animate-pulse"></i>
+                <div>
+                    <h2 class="text-2xl font-black italic uppercase leading-none">Топ Рейтинг</h2>
+                    <p class="text-[10px] font-bold opacity-80 tracking-widest uppercase">Найкращі моменти школи</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Feed -->
+        <main id="feed-container" class="flex-1 overflow-y-auto pb-32 scroll-smooth">
+            <!-- Posts injected via JS -->
+        </main>
+
+        <!-- FAB (Add Post) -->
+        <button id="btn-open-editor" class="fixed bottom-32 right-8 md:right-[calc(50%-12rem)] w-16 h-16 md:w-20 md:h-20 bg-blue-600 rounded-[2rem] md:rounded-[2.5rem] text-white shadow-2xl flex items-center justify-center z-40 rotate-6 active:scale-90 transition-all border-4 border-white ring-4 ring-blue-50">
+            <i data-lucide="plus" width="36" stroke-width="3"></i>
+        </button>
+
+        <!-- Bottom Navigation -->
+        <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-slate-900/95 backdrop-blur-2xl rounded-[3rem] p-4 flex justify-around shadow-2xl border border-white/10 z-50">
+            <button id="nav-feed" class="p-3 rounded-2xl transition-all bg-blue-600 text-white scale-110 shadow-lg shadow-blue-500/50">
+                <i data-lucide="home" width="24"></i>
+            </button>
+            <button id="nav-top5" class="p-3 rounded-2xl transition-all text-slate-500 hover:text-slate-300">
+                <i data-lucide="trophy" width="24"></i>
+            </button>
+        </nav>
+
+        <!-- Post Editor Modal -->
+        <div id="editor-modal" class="hide fixed inset-0 bg-white z-[60] flex flex-col slide-up">
+            <div class="p-6 md:p-10 flex flex-col h-full">
+                <div class="flex justify-between items-center mb-10">
+                    <button id="btn-close-editor" class="p-3 bg-slate-50 rounded-2xl text-slate-400">
+                        <i data-lucide="x" width="24"></i>
+                    </button>
+                    <button id="btn-publish" class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs active:scale-95 transition-transform">
+                        Опублікувати
+                    </button>
+                </div>
+                
+                <textarea id="post-content" placeholder="Що цікавого сьогодні?" class="w-full text-2xl md:text-3xl font-black outline-none resize-none flex-1 placeholder:text-slate-100"></textarea>
+                
+                <div id="image-preview-container" class="hide relative mt-4 group rounded-[2.5rem] overflow-hidden shadow-xl border-2 border-slate-100 max-h-48">
+                    <img id="image-preview" src="" class="w-full h-48 object-cover" alt="Preview">
+                    <button id="btn-remove-image" class="absolute top-3 right-3 bg-black/60 text-white p-2 rounded-xl">
+                        <i data-lucide="x" width="16"></i>
+                    </button>
+                </div>
+
+                <div class="py-6 border-t flex flex-col gap-3">
+                    <div id="image-input-area" class="hide flex gap-2">
+                        <input id="image-url-input" type="text" placeholder="https://..." class="flex-1 bg-slate-50 p-3 rounded-xl text-sm font-bold border-2 border-transparent focus:border-blue-200 outline-none">
+                        <button id="btn-confirm-image" class="bg-blue-600 text-white p-3 rounded-xl font-bold text-xs uppercase">OK</button>
+                    </div>
+                    <button id="btn-add-image" class="self-start flex items-center gap-2 bg-slate-50 px-5 py-3 rounded-2xl text-slate-600 font-black text-[10px] uppercase tracking-wider hover:bg-slate-100">
+                        <i data-lucide="image" width="18"></i> Додати фото
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Config & Init ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'school-space-v8';
+
+        if (!firebaseConfig) {
+            alert("Firebase Config not found. Please run this in the correct environment.");
+            throw new Error("No Firebase Config");
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        // --- State ---
+        let currentUser = null;
+        let posts = [];
+        let currentView = 'feed'; // 'feed' | 'top5'
+        let isLoginMode = true;
+        let tempImageUrl = '';
+
+        // --- DOM Elements ---
+        const els = {
+            loading: document.getElementById('loading-screen'),
+            loginScreen: document.getElementById('login-screen'),
+            appScreen: document.getElementById('app-screen'),
+            feedContainer: document.getElementById('feed-container'),
+            top5Banner: document.getElementById('top5-banner'),
+            userAvatar: document.getElementById('user-avatar'),
+            
+            // Auth
+            emailForm: document.getElementById('email-auth-form'),
+            inputName: document.getElementById('input-name'),
+            inputEmail: document.getElementById('input-email'),
+            inputPassword: document.getElementById('input-password'),
+            btnSubmitAuth: document.getElementById('btn-submit-auth'),
+            btnToggleAuth: document.getElementById('btn-toggle-auth'),
+            btnGoogle: document.getElementById('btn-google-login'),
+            authError: document.getElementById('auth-error'),
+            authErrorText: document.getElementById('auth-error-text'),
+            domainDebug: document.getElementById('domain-debug'),
+            domainText: document.getElementById('domain-text'),
+            
+            // Navigation
+            navFeed: document.getElementById('nav-feed'),
+            navTop5: document.getElementById('nav-top5'),
+            btnLogout: document.getElementById('btn-logout'),
+            
+            // Editor
+            editorModal: document.getElementById('editor-modal'),
+            btnOpenEditor: document.getElementById('btn-open-editor'),
+            btnCloseEditor: document.getElementById('btn-close-editor'),
+            btnPublish: document.getElementById('btn-publish'),
+            postContent: document.getElementById('post-content'),
+            btnAddImage: document.getElementById('btn-add-image'),
+            imageInputArea: document.getElementById('image-input-area'),
+            imageUrlInput: document.getElementById('image-url-input'),
+            btnConfirmImage: document.getElementById('btn-confirm-image'),
+            imagePreviewContainer: document.getElementById('image-preview-container'),
+            imagePreview: document.getElementById('image-preview'),
+            btnRemoveImage: document.getElementById('btn-remove-image'),
+        };
+
+        // --- Helpers ---
+        const show = (el) => el.classList.remove('hide');
+        const hide = (el) => el.classList.add('hide');
+        const calculateAvg = (ratings = {}) => {
+            const vals = Object.values(ratings);
+            if (vals.length === 0) return 0;
+            return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+        };
+
+        // --- Auth Logic ---
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            hide(els.loading);
+            if (user) {
+                hide(els.loginScreen);
+                show(els.appScreen);
+                initApp();
+            } else {
+                show(els.loginScreen);
+                hide(els.appScreen);
+                // Reset login form state
+                isLoginMode = true;
+                updateAuthUI();
+            }
+        });
+
+        const updateAuthUI = () => {
+            if (isLoginMode) {
+                hide(els.inputName);
+                els.btnSubmitAuth.textContent = 'Увійти';
+                els.btnToggleAuth.textContent = 'Ще немає акаунту? Реєстрація';
+            } else {
+                show(els.inputName);
+                els.btnSubmitAuth.textContent = 'Створити акаунт';
+                els.btnToggleAuth.textContent = 'Вже маю акаунт? Увійти';
+            }
+            hide(els.authError);
+        };
+
+        els.btnToggleAuth.addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            updateAuthUI();
+        });
+
+        els.emailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = els.inputEmail.value;
+            const password = els.inputPassword.value;
+            const name = els.inputName.value;
+
+            try {
+                if (isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    const res = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(res.user, { displayName: name });
+                }
+            } catch (err) {
+                show(els.authError);
+                els.authErrorText.textContent = "Помилка: " + err.message;
+            }
+        });
+
+        els.btnGoogle.addEventListener('click', async () => {
+            hide(els.authError);
+            hide(els.domainDebug);
+            try {
+                await signInWithPopup(auth, googleProvider);
+            } catch (err) {
+                console.error(err);
+                show(els.authError);
+                if (err.message && err.message.includes("unauthorized-domain")) {
+                    els.authErrorText.textContent = "Цей домен не авторизовано у Firebase.";
+                    show(els.domainDebug);
+                    els.domainText.textContent = window.location.hostname;
+                } else {
+                    els.authErrorText.textContent = err.message;
+                }
+            }
+        });
+
+        els.btnLogout.addEventListener('click', () => signOut(auth));
+
+        // --- App Logic ---
+        function initApp() {
+            // Set Avatar
+            const initial = currentUser.displayName ? currentUser.displayName[0] : (currentUser.email ? currentUser.email[0].toUpperCase() : '?');
+            els.userAvatar.textContent = initial;
+
+            // Load Posts
+            const q = collection(db, 'artifacts', appId, 'public', 'data', 'posts');
+            onSnapshot(q, (snapshot) => {
+                posts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderFeed();
+            });
+
+            // Initialize Icons initially
+            lucide.createIcons();
+        }
+
+        // --- Rendering ---
+        function renderFeed() {
+            els.feedContainer.innerHTML = '';
+            
+            let displayPosts = [...posts];
+
+            if (currentView === 'top5') {
+                displayPosts.sort((a, b) => calculateAvg(b.ratings) - calculateAvg(a.ratings));
+                displayPosts = displayPosts.slice(0, 5);
+            } else {
+                displayPosts.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            }
+
+            displayPosts.forEach((post, idx) => {
+                const avgRating = calculateAvg(post.ratings);
+                const userRating = post.ratings && post.ratings[currentUser.uid] ? post.ratings[currentUser.uid] : 0;
+                
+                const postEl = document.createElement('div');
+                postEl.className = 'p-6 border-b hover:bg-slate-50/50 transition-all relative fade-in';
+                
+                // Top 5 Badge
+                let badgeHTML = '';
+                if (currentView === 'top5') {
+                    badgeHTML = `
+                    <div class="absolute left-0 top-8 bg-black text-white px-4 py-1.5 rounded-r-2xl font-black italic shadow-lg z-10">
+                        #${idx + 1}
+                    </div>`;
+                }
+
+                // Stars Logic
+                let starsHTML = '';
+                for (let i = 1; i <= 5; i++) {
+                    const isActive = userRating >= i;
+                    const colorClass = isActive ? 'text-orange-400 fill-orange-400' : 'text-slate-200';
+                    const labelColor = userRating === i ? 'text-orange-600' : 'text-slate-300';
+                    
+                    starsHTML += `
+                        <button class="btn-rate flex flex-col items-center gap-2 group/star outline-none active:scale-125 transition-transform" data-id="${post.id}" data-rating="${i}">
+                            <i data-lucide="star" width="32" class="${colorClass} transition-colors group-hover/star:text-orange-200"></i>
+                            <span class="text-[10px] font-black ${labelColor}">${i}</span>
+                        </button>
+                    `;
+                }
+
+                postEl.innerHTML = `
+                    ${badgeHTML}
+                    <div class="flex gap-5">
+                        <div class="w-14 h-14 rounded-3xl bg-blue-50 border-2 border-blue-100 flex items-center justify-center font-black text-blue-600 text-xl shadow-sm flex-shrink-0">
+                            ${post.author ? post.author[0] : '?'}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 mb-2">
+                                <span class="font-black text-slate-900 text-lg tracking-tight truncate">${post.author || 'Anon'}</span>
+                                <i data-lucide="check-circle-2" width="16" class="text-blue-500 fill-blue-500"></i>
+                            </div>
+                            <p class="text-slate-700 font-medium mb-5 whitespace-pre-wrap leading-relaxed text-[16px]">${post.content}</p>
+                            ${post.image ? `
+                                <div class="rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl mb-6 ring-1 ring-slate-100">
+                                    <img src="${post.image}" class="w-full h-auto object-cover max-h-[400px]" alt="Post content" loading="lazy">
+                                </div>
+                            ` : ''}
+                            
+                            <div class="bg-slate-50/80 p-5 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                                <div class="flex items-center justify-between mb-4 px-2">
+                                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Рейтинг</span>
+                                    <div class="flex items-center gap-1.5 text-orange-500 font-black text-xl">
+                                        <i data-lucide="star" width="22" class="fill-current"></i>
+                                        <span>${avgRating}</span>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between px-2">
+                                    ${starsHTML}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                els.feedContainer.appendChild(postEl);
+            });
+            
+            lucide.createIcons();
+            
+            // Attach Star Listeners
+            document.querySelectorAll('.btn-rate').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const postId = btn.dataset.id;
+                    const rating = parseInt(btn.dataset.rating);
+                    const post = posts.find(p => p.id === postId);
+                    if (post) handleRate(post.id, post.ratings, rating);
+                });
+            });
+        }
+
+        async function handleRate(id, currentRatings = {}, ratingValue) {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'posts', id);
+            const updatedRatings = { ...currentRatings, [currentUser.uid]: ratingValue };
+            await updateDoc(ref, { ratings: updatedRatings });
+        }
+
+        // --- View Switching ---
+        function setView(viewName) {
+            currentView = viewName;
+            
+            // Update Nav UI
+            if (viewName === 'feed') {
+                els.navFeed.className = 'p-3 rounded-2xl transition-all bg-blue-600 text-white scale-110 shadow-lg shadow-blue-500/50';
+                els.navTop5.className = 'p-3 rounded-2xl transition-all text-slate-500';
+                hide(els.top5Banner);
+            } else {
+                els.navTop5.className = 'p-3 rounded-2xl transition-all bg-amber-500 text-white scale-110 shadow-lg shadow-amber-500/50';
+                els.navFeed.className = 'p-3 rounded-2xl transition-all text-slate-500';
+                show(els.top5Banner);
+            }
+            
+            renderFeed();
+        }
+
+        els.navFeed.addEventListener('click', () => setView('feed'));
+        els.navTop5.addEventListener('click', () => setView('top5'));
+
+        // --- Post Editor ---
+        els.btnOpenEditor.addEventListener('click', () => {
+            show(els.editorModal);
+            els.postContent.focus();
+        });
+
+        els.btnCloseEditor.addEventListener('click', () => {
+            hide(els.editorModal);
+            // Reset editor
+            els.postContent.value = '';
+            tempImageUrl = '';
+            hide(els.imagePreviewContainer);
+            hide(els.imageInputArea);
+        });
+
+        els.btnAddImage.addEventListener('click', () => {
+            show(els.imageInputArea);
+            els.imageUrlInput.focus();
+        });
+
+        els.btnConfirmImage.addEventListener('click', () => {
+            const url = els.imageUrlInput.value.trim();
+            if (url) {
+                tempImageUrl = url;
+                els.imagePreview.src = url;
+                show(els.imagePreviewContainer);
+                hide(els.imageInputArea);
+                els.imageUrlInput.value = '';
+            }
+        });
+
+        els.btnRemoveImage.addEventListener('click', () => {
+            tempImageUrl = '';
+            hide(els.imagePreviewContainer);
+        });
+
+        els.btnPublish.addEventListener('click', async () => {
+            const content = els.postContent.value.trim();
+            if (!content && !tempImageUrl) return;
+
+            els.btnPublish.disabled = true;
+            els.btnPublish.textContent = '...';
+
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'posts'), {
+                    uid: currentUser.uid,
+                    author: currentUser.displayName || currentUser.email.split('@')[0],
+                    content: content,
+                    image: tempImageUrl,
+                    ratings: {},
+                    createdAt: serverTimestamp()
+                });
+                // Close and clean
+                els.btnCloseEditor.click();
+            } catch (e) {
+                console.error(e);
+                alert("Не вдалося опублікувати.");
+            } finally {
+                els.btnPublish.disabled = false;
+                els.btnPublish.textContent = 'ОПУБЛІКУВАТИ';
+            }
+        });
+
+        // Copy Domain Helper
+        document.getElementById('btn-copy-domain').addEventListener('click', () => {
+            const text = document.getElementById('domain-text').textContent;
+            navigator.clipboard.writeText(text);
+        });
+
+        // Initialize Lucide icons for static elements
+        lucide.createIcons();
+    </script>
+</body>
+</html>
